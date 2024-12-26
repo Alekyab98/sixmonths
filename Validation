@@ -1,0 +1,33 @@
+WITH table1 AS (
+    SELECT 
+        event_time, 
+        fqdn, 
+        JSON_EXTRACT_SCALAR(labels, '$.apn') AS labels_apn, 
+        metric_sum_value
+    FROM vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls.v_aether_smf_performance
+    WHERE trans_dt = '2024-12-16' 
+      AND metric_name = 'active_sessions' 
+      AND fqdn = 'arttnbivzwcsmf-y-ec-consp-001' 
+      AND JSON_EXTRACT_SCALAR(labels, '$.apn') = 'vzwapp' 
+      AND event_time BETWEEN '2024-12-16 00:00:00' AND '2024-12-16 02:00:00'
+),
+table2 AS (
+    SELECT 
+        event_time, 
+        fqdn, 
+        JSON_EXTRACT_SCALAR(labels, '$.apn') AS labels_apn, 
+        metric_sum_value
+    FROM vz-it-np-gudv-dev-dtwndo-0.aid_nwperf_aether_core_tbls.historic_temp
+    WHERE trans_dt = '2024-12-16' 
+      AND metric_name = 'active_sessions' 
+      AND fqdn = 'arttnbivzwcsmf-y-ec-consp-001' 
+      AND JSON_EXTRACT_SCALAR(labels, '$.apn') = 'vzwapp' 
+      AND event_time BETWEEN '2024-12-16 01:00:00' AND '2024-12-16 03:00:00'
+)
+SELECT 
+    (COUNT(*) FILTER (WHERE t1.metric_sum_value = t2.metric_sum_value) * 100.0) / COUNT(*) AS match_percentage
+FROM table1 t1
+INNER JOIN table2 t2
+ON t1.event_time = t2.event_time 
+   AND t1.fqdn = t2.fqdn 
+   AND t1.labels_apn = t2.labels_apn;
