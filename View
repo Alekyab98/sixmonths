@@ -1,0 +1,30 @@
+WITH lookup AS (
+  -- Fetch the mapping of Primary and Secondary FQDNs
+  SELECT 
+    primary_fqdn,
+    secondary_fqdn
+  FROM `your_project.your_dataset.primary_secondary_fqdn_table`
+),
+view_with_primary AS (
+  -- Map the FQDNs from the SMF table to the PrimaryFQDN column
+  SELECT 
+    smf.*,
+    CASE
+      -- If FQDN exists as a Primary FQDN, return it as is
+      WHEN smf.fqdn IN (SELECT primary_fqdn FROM lookup) THEN smf.fqdn
+      
+      -- If FQDN exists as a Secondary FQDN, fetch the corresponding Primary FQDN
+      WHEN smf.fqdn IN (SELECT secondary_fqdn FROM lookup) THEN (
+        SELECT primary_fqdn 
+        FROM lookup
+        WHERE secondary_fqdn = smf.fqdn
+      )
+      
+      -- If no match, set NULL or a default value
+      ELSE NULL
+    END AS primary_fqdn
+  FROM `your_project.your_dataset.smf_table` smf
+)
+-- Final output
+SELECT *
+FROM view_with_primary;
