@@ -1,5 +1,50 @@
+import csv
+import json
+import subprocess
+from datetime import datetime, timezone
+from urllib.parse import quote
+
+# Function to load API keys from a file
+def load_api_keys(filename):
+    api_keys = {}
+    with open(filename, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line:
+                function_name, key = line.split(':', 1)
+                api_keys[function_name] = key.strip()
+    return api_keys
+
+# Function to convert epoch time to readable UTC timestamp
+def convert_epoch_to_timestamp(epoch_time):
+    return datetime.fromtimestamp(int(epoch_time), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+# Function to extract date from timestamp (YYYY-MM-DD format)
+def extract_date_from_timestamp(timestamp):
+    return timestamp.split(' ')[0]
+
+# Function to safely convert data to JSON
+def safe_json_dumps(data):
+    try:
+        return json.dumps(data)
+    except Exception as e:
+        print("JSON Error:", e, data)
+        return "{}"
+
+# Function to execute curl command and get raw JSON data
+def execute_curl_and_get_data(curl_command):
+    result = subprocess.run(curl_command, shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Error executing curl command: {result.stderr}")
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON response: {e}")
+        return None
+
+# Function to fetch data for a single metric query
 def fetch_metric_data_separately(curl_command, metric_name, column_name):
-    """Fetch data for a single metric and return normalized rows."""
     response_data = execute_curl_and_get_data(curl_command)
     if not response_data or response_data.get('status') != 'success':
         print(f"No data found for query: {curl_command}")
@@ -31,8 +76,8 @@ def fetch_metric_data_separately(curl_command, metric_name, column_name):
 
     return data_rows
 
+# Function to fetch and combine metrics by processing them individually
 def fetch_combined_metrics_individually(input_files, api_keys, output_file_base, max_rows_per_file=100000):
-    """Fetch and combine metrics by processing them individually."""
     start_epoch = '1719792000'  # Example start time
     end_epoch = '1725490800'    # Example end time
     step = '1h'
@@ -69,35 +114,4 @@ def fetch_combined_metrics_individually(input_files, api_keys, output_file_base,
                 # Query B: increase
                 query_increase = f'increase({metric_name}[1h])'
                 curl_command_increase = (
-                    f"curl --location --globoff \"https://us.aether.nss.vzwnet.com/gem/prometheus/api/v1/query_range?"
-                    f"query={quote(query_increase)}&start={start_epoch}&end={end_epoch}&step={step}\""
-                    f" --header \"Authorization: Basic {encoded_api_key}\""
-                )
-                increase_data = fetch_metric_data_separately(curl_command_increase, metric_name, "metric_increase")
-
-                # Merge the two sets of data
-                combined_data = {}
-                for row in sum_data + increase_data:
-                    key = (row["metric_name"], row["FQDN"], row["event_time"])
-                    if key not in combined_data:
-                        combined_data[key] = row
-                    else:
-                        combined_data[key].update(row)
-
-                # Write to the current CSV file
-                for row in combined_data.values():
-                    writer.writerow(row)
-                    row_count += 1
-
-                    # Check if we need to create a new file
-                    if row_count >= max_rows_per_file:
-                        csv_file.close()
-                        file_count += 1
-                        row_count = 0
-                        output_file = f"{output_file_base}_{file_count}.csv"
-                        csv_file = open(output_file, mode='w', newline='')
-                        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                        writer.writeheader()
-
-    csv_file.close()
-    print(f"Combined data written to CSV files with a maximum of {max_rows_per_file} rows per file.")
+                    f"curl --location --globoff \"https://us.aether.nss.vz
