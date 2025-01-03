@@ -1,0 +1,24 @@
+insert into `vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls.aether_upf_performance`
+with base_data as 
+(select  
+safe_cast(transdt as DATE) as trans_dt,
+event_time ,
+FQDN as fqdn,
+JSON_REMOVE(SAFE.PARSE_JSON(labels),'$.__name__','$.jobid','$.job','$.localdn','$.instance','$.write_relabel_group','$.kubernetes_namespace','$.kubernetes_pod_name','$.applicationId','$.market','$.region','$.territory') as labels,
+metric_name, 
+safe_cast(metric_sum as bignumeric) as metric_sum_value,
+safe_cast(metric_increase as bignumeric) as metric_increase_value,
+from vz-it-pr-gudv-dtwndo-0.aid_nwperf_aether_core_tbls.upf_data_temp
+where transdt is not null),
+base_data_2 as(
+select trans_dt,
+event_time,
+fqdn,
+to_json_string(labels )as labels,
+metric_name, 
+sum(metric_sum_value) as metric_sum_value,
+sum(metric_increase_value) as metric_increase_value 
+from base_data
+group by 1,2,3,4,5)
+select transdt,event_time,fqdn,SAFE.PARSE_JSON(labels) as labels,metric_name, metric_sum ,metric_inc
+from base_data_2
